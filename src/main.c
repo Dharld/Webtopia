@@ -50,23 +50,24 @@ int main() {
 	printf("Waiting for a client to connect...\n");
 	client_addr_len = sizeof(client_addr);
 
-	accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+	int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+  if (client_fd == -1) {
+    printf("Accept failed: %s\n", strerror(errno));
+    return 1;
+  }
 	printf("Client connected\n");
   
   // Create a response object
   struct http_response response = {
     .status_line = "HTTP/1.1 200 OK",
   };
-
-  // Format the response in an appropriate body
-  char response_str[1024];
-  int offset = 0;
-
-  // Add the status line
-  offset += snprintf(response_str, sizeof(response_str) - offset, "%s\r\n\r\n", response.status_line);
   
-  // Send the response
-  ssize_t bytes_sent = write(server_fd, response_str, offset);
+  char response_str[1024] = {0};
+  size_t response_size = parse_response(&response, response_str, sizeof(response_str));  
+ 
+  // Send the response to the client
+  ssize_t bytes_sent = write(client_fd, response_str, response_size);
+
   if (bytes_sent < 0) {
     perror("Failed to send response");
   }
