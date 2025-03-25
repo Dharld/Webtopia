@@ -59,7 +59,7 @@ int main() {
   }
 
   // Format the response in an appropriate body
-  char response_str[1024] = {'\0'};
+  char response_str[1024];
   int offset = 0;
 
   // Add the status line
