@@ -16,10 +16,6 @@ int main() {
 
 	int server_fd, client_addr_len;
 	struct sockaddr_in client_addr;
-  
-  // Format the response in an appropriate body
-  char response_str[1024];
-  int offset = 0;
 
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == -1) {
@@ -60,8 +56,12 @@ int main() {
   // Create a response object
   struct http_response response = {
     .status_line = "HTTP/1.1 200 OK",
-  }
- 
+  };
+
+  // Format the response in an appropriate body
+  char response_str[1024];
+  int offset = 0;
+
   // Add the status line
   offset += snprintf(response_str, sizeof(response_str) - offset, "%s\r\n\r\n", response.status_line);
   
