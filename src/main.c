@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include "http_response.h"
+#include "http_request.h"
 
 
 int main() {
@@ -57,21 +58,89 @@ int main() {
   }
 	printf("Client connected\n");
   
-  // Create a response object
-  struct http_response response = {
-    .status_line = "HTTP/1.1 200 OK",
-  };
-  
-  char response_str[1024] = {0};
-  size_t response_size = parse_response(&response, response_str, sizeof(response_str));  
- 
-  // Send the response to the client
-  ssize_t bytes_sent = write(client_fd, response_str, response_size);
-
-  if (bytes_sent < 0) {
-    perror("Failed to send response");
+  while (true) {
+    // Listen for request from the client
+    char buffer[1024] = {0};
+    size_t bytes_read = 0;
+    size_t total_bytes_read = 0;
+    
+    while ((bytes_read = read(client_fd, buffer + total_bytes_read, sizeof(buffer) - total_bytes_read - 1)) > 0) {
+        total_bytes_read += bytes_read;
+        buffer[total_bytes_read] = '\0';
+        
+        // Check if we already read the CLRF
+        if (strstr(buffer, "\r\n\r\n")) {
+            break;
+        }
+        
+        if (total_bytes_read + 1 >= sizeof(buffer)) {
+            break;
+        }
+    }
+    
+    struct http_request request;
+    int success = parse_request(&request, buffer, total_bytes_read);
+    if (success < 0) {
+        perror("Failed parsing the request");
+        continue;  // Skip to next iteration on error
+    }
+    
+    // Default status line
+    char* status_line = "HTTP/1.1 404 Not Found";
+    
+    // Navigate through each header of the object and extract the path
+    if (request.request_line != NULL) {
+        // The request line has format "METHOD PATH HTTP/VERSION"
+        char* req_line_copy = strdup(request.request_line);
+        char* method_str = strtok(req_line_copy, " ");
+        char* path = strtok(NULL, " ");
+        
+        printf("Path requested: %s\n", path);
+        
+        // Check path and set appropriate response
+        if (path != NULL && strcmp(path, "/") == 0) {
+            // Root path - return 200 OK
+            status_line = "HTTP/1.1 200 OK";
+        }
+        
+        free(req_line_copy);  // Free the duplicated request line
+    }
+    
+    // Navigate through each header
+    for(int i = 0; i < request.header_count; i++) {
+        char* header_copy = strdup(request.headers[i]);
+        
+        // Extract the name and value
+        char* header_name = strtok(header_copy, ":");
+        char* header_value = strtok(NULL, "");
+        
+        if (header_name && header_value) {
+            // Trim the header value
+            while (*header_value == ' ') {
+                header_value++;
+            }
+            printf("Header: %s = %s\n", header_name, header_value);
+        }
+        
+        free(header_copy);
+    }
+    
+    // Create a response object
+    struct http_response response = {
+        .status_line = status_line,
+    };
+    
+    char response_str[1024] = {0};
+    size_t response_size = parse_response(&response, response_str, sizeof(response_str));  
+    
+    // Send the response to the client
+    ssize_t bytes_sent = write(client_fd, response_str, response_size);
+    if (bytes_sent < 0) {
+        perror("Failed to send response");
+    }
+    
   }
-
+  
 	close(server_fd);
 
 	return 0;
