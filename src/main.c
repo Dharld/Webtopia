@@ -6,19 +6,18 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include "http_response.h"
+
 
 int main() {
 	// Disable output buffering
 	setbuf(stdout, NULL);
  	setbuf(stderr, NULL);
 
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	printf("Logs from your program will appear here!\n");
-
-	// Uncomment this block to pass the first stage
 	int server_fd, client_addr_len;
 	struct sockaddr_in client_addr;
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+  server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == -1) {
 		printf("Socket creation failed: %s...\n", strerror(errno));
 		return 1;
@@ -53,6 +52,24 @@ int main() {
 
 	accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
 	printf("Client connected\n");
+  
+  // Create a response object
+  struct http_response response = {
+    .status_line = "HTTP/1.1 200 OK",
+  }
+
+  // Format the response in an appropriate body
+  char response_str[1024] = {'\0'};
+  int offset = 0;
+
+  // Add the status line
+  offset += snprintf(response_str, sizeof(response_str) - offset, "%s\r\n\r\n", response.status_line);
+  
+  // Send the response
+  ssize_t bytes_sent = write(server_fd, response_str, offset);
+  if (bytes_sent < 0) {
+    perror("Failed to send response");
+  }
 
 	close(server_fd);
 
